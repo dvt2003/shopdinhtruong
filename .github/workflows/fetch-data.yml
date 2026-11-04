@@ -2,11 +2,11 @@ name: Auto Fetch Google Sheet Data
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Cho phép bấm chạy thủ công
+    - cron: '*/15 * * * *' # Chạy tự động mỗi 15 phút
+  workflow_dispatch: # Cho phép bấm nút "Run workflow" thủ công trên GitHub
 
 permissions:
-  contents: write
+  contents: write # Cấp quyền ghi để bot có thể push file data.csv vào repo
 
 jobs:
   fetch-and-commit:
@@ -15,16 +15,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Tải dữ liệu từ Google Sheets về dạng CSV
-        run: |
-          # Dùng ID file của bạn để export thành data.csv
-          curl -L "https://docs.google.com/spreadsheets/d/1pKyvtyL9_aYt98nGbgYadu0YQgD7N9EJI7ZkMOg1xLo/export?format=csv" -o data.csv
+      - name: Fetch CSV từ Google Sheets
+        run: curl -L "https://docs.google.com/spreadsheets/d/1pKyvtyL9_aYt98nGbgYadu0YQgD7N9EJI7ZkMOg1xLo/export?format=csv" -o data.csv
 
-      - name: Commit và Push file CSV
+      - name: Commit và Push (chỉ khi có thay đổi)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data.csv
-          git commit -m "Auto-update: Cập nhật dữ liệu từ Google Sheets" || exit 0
-          git push
-          
+          # Lệnh kiểm tra: Nếu dữ liệu có thay đổi mới commit và push, không đổi thì bỏ qua
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update: Đồng bộ dữ liệu CSV mới" && git push)
