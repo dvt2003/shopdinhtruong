@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dữ liệu Trực Tuyến</title>
+    <title>Dữ liệu Đồng Bộ - Đinh Trường</title>
     <style>
         body {
             margin: 0;
             padding: 20px;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #121212;
-            color: #ffffff;
+            color: #e0e0e0;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -18,18 +18,39 @@
         }
         h2 {
             text-align: center;
-            margin-bottom: 25px;
-            font-weight: 500;
-            letter-spacing: 1px;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #888;
+        }
+        .live-indicator {
+            width: 8px;
+            height: 8px;
+            background-color: #4caf50;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #4caf50;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.5; }
         }
         .glass-container {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
             padding: 20px;
-            width: 95%;
+            width: 100%;
             max-width: 1200px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
             overflow-x: auto;
@@ -40,18 +61,21 @@
             white-space: nowrap;
         }
         th, td {
-            padding: 15px;
+            padding: 12px 16px;
             text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         th {
             background-color: rgba(255, 255, 255, 0.05);
             font-weight: 600;
             color: #4da8da;
+            position: sticky;
+            top: 0;
         }
-        tr:hover {
-            background-color: rgba(255, 255, 255, 0.08);
-            transition: background-color 0.2s ease;
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            transition: all 0.2s ease;
         }
         .error {
             color: #ff5252;
@@ -62,43 +86,55 @@
 </head>
 <body>
 
-    <h2>DỮ LIỆU ĐỒNG BỘ TỪ GOOGLE SHEETS</h2>
+    <h2>BẢNG DỮ LIỆU ĐỒNG BỘ</h2>
+    
+    <div class="status-container">
+        <div class="live-indicator" id="indicator"></div>
+        <span id="lastUpdate">Đang kết nối tải dữ liệu...</span>
+    </div>
     
     <div class="glass-container">
         <table id="dataTable">
-            <!-- Dữ liệu CSV sẽ được đổ vào đây -->
-            <tr><td style="text-align:center;">Đang tải dữ liệu...</td></tr>
+            <tr><td style="text-align:center;">Đang tải nội dung...</td></tr>
         </table>
     </div>
 
     <script>
         async function loadData() {
             try {
-                // Thêm timestamp vào URL để trình duyệt luôn lấy file CSV mới nhất, không bị cache
-                const response = await fetch('data.csv?t=' + new Date().getTime());
-                if (!response.ok) throw new Error('Không tìm thấy file data.csv');
+                // Ép trình duyệt không cache bằng thời gian thực
+                const timestamp = new Date().getTime();
+                const response = await fetch(`data.csv?t=${timestamp}`);
+                
+                if (!response.ok) throw new Error('Chưa tìm thấy data.csv');
                 
                 const csvText = await response.text();
                 renderTable(csvText);
+                
+                const now = new Date();
+                document.getElementById('lastUpdate').textContent = `Làm mới lần cuối lúc: ${now.toLocaleTimeString('vi-VN')}`;
+                document.getElementById('indicator').style.backgroundColor = '#4caf50'; // Xanh lá khi thành công
             } catch (error) {
-                document.getElementById('dataTable').innerHTML = `<tr><td class="error">Lỗi: ${error.message}.<br>Có thể GitHub Actions chưa chạy để tạo file data.csv. Hãy kiểm tra tab Actions.</td></tr>`;
+                document.getElementById('dataTable').innerHTML = `<tr><td class="error">Đang chờ hệ thống tạo file data.csv... Quá trình này mất khoảng vài phút trong lần chạy đầu tiên.</td></tr>`;
+                document.getElementById('lastUpdate').textContent = "Đang chờ đồng bộ";
+                document.getElementById('indicator').style.backgroundColor = '#ff9800'; // Cam khi đang chờ/lỗi
             }
         }
 
         function renderTable(csvText) {
-            // Tách các dòng và bỏ qua các dòng trống
-            const rows = csvText.split('\n').filter(row => row.trim() !== '');
+            // Loại bỏ ký tự carriage return (\r) của Windows/Google Sheets và chia dòng
+            const rows = csvText.replace(/\r/g, '').split('\n').filter(row => row.trim() !== '');
             const table = document.getElementById('dataTable');
             table.innerHTML = ''; 
 
             rows.forEach((row, index) => {
-                // Regex phân tách CSV chuyên dụng: Bỏ qua dấu phẩy nằm trong ngoặc kép
+                // Tách cột theo dấu phẩy, bỏ qua dấu phẩy nằm trong ngoặc kép
                 const columns = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 const tr = document.createElement('tr');
                 
                 columns.forEach(col => {
                     const cell = index === 0 ? document.createElement('th') : document.createElement('td');
-                    // Xóa ký tự ngoặc kép ở đầu/cuối chuỗi do định dạng CSV tạo ra
+                    // Xóa ngoặc kép bao quanh dữ liệu do định dạng CSV
                     cell.textContent = col.replace(/(^"|"$)/g, '').trim();
                     tr.appendChild(cell);
                 });
@@ -107,8 +143,10 @@
             });
         }
 
-        // Tự động chạy hàm khi load trang
-        window.onload = loadData;
+        // Tải dữ liệu ngay khi mở web
+        loadData();
+        // Tự động quét lại file mỗi 60 giây (60000 ms)
+        setInterval(loadData, 60000); 
     </script>
 </body>
 </html>
