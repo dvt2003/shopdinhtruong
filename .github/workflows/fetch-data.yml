@@ -1,0 +1,30 @@
+name: Auto Fetch Google Sheet Data
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Cho phép bấm chạy thủ công
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Tải dữ liệu từ Google Sheets về dạng CSV
+        run: |
+          # Dùng ID file của bạn để export thành data.csv
+          curl -L "https://docs.google.com/spreadsheets/d/1pKyvtyL9_aYt98nGbgYadu0YQgD7N9EJI7ZkMOg1xLo/export?format=csv" -o data.csv
+
+      - name: Commit và Push file CSV
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.csv
+          git commit -m "Auto-update: Cập nhật dữ liệu từ Google Sheets" || exit 0
+          git push
+          
